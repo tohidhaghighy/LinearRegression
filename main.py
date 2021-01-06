@@ -33,34 +33,58 @@ def cross_validate(x, y, k=5):
         scores.append(s)
     return sum(scores) / len(scores)
 
-if(__name__=="__main__"):
-    #main
-    names = ['word_freq_make', 'word_freq_address', 'word_freq_all', 'word_freq_3d', 'word_freq_our',
- 'word_freq_over', 'word_freq_remove', 'word_freq_internet', 'word_freq_order', 'word_freq_mail',
- 'word_freq_receive', 'word_freq_will', 'word_freq_people', 'word_freq_report', 'word_freq_addresses',
- 'word_freq_free', 'word_freq_business', 'word_freq_email', 'word_freq_you', 'word_freq_credit',
- 'word_freq_your', 'word_freq_font', 'word_freq_000', 'word_freq_money', 'word_freq_hp',
- 'word_freq_hpl', 'word_freq_george', 'word_freq_650', 'word_freq_lab', 'word_freq_labs',
- 'word_freq_telnet', 'word_freq_857', 'word_freq_data', 'word_freq_415', 'word_freq_85',
- 'word_freq_technology', 'word_freq_1999', 'word_freq_parts', 'word_freq_pm', 'word_freq_direct',
- 'word_freq_cs', 'word_freq_meeting', 'word_freq_original', 'word_freq_project', 'word_freq_re',
- 'word_freq_edu', 'word_freq_table', 'word_freq_conference', 'char_freq_;', 'char_freq_(',
- 'char_freq_[', 'char_freq_!', 'char_freq_$', 'char_freq_#',
- 'capital_run_length_average', 'capital_run_length_longest', 'capital_run_length_total', "spam"]
 
-    df = pd.read_csv("./spambase.data", header=None, names=names)
+def create_mini_batches(X, y, batch_size): 
+    mini_batches = [] 
+    data = np.hstack((X, y)) 
+    np.random.shuffle(data) 
+    n_minibatches = data.shape[0] // batch_size 
     
-    df_features = df.iloc[:, 0:57]
-    df_targets = df.loc[: , "spam"]
-    x = df.iloc[:, 0:56].values
-    y = df.loc[: , "spam"].values
-    # Standardizing the features onto unit scale (mean = 0 and variance = 1)
-    x_std = StandardScaler().fit_transform(x)
-    # Adding 0.1 and logging all elements
-    x_log = np.log(x + 0.1)
-    # Binarizing data
-    x_bin = np.where(x>0, 1, 0)
+    for i in range(n_minibatches + 1): 
+        mini_batch = data[i * batch_size:(i + 1)*batch_size, :] 
+        X_mini = mini_batch[:, :-1] 
+        Y_mini = mini_batch[:, -1].reshape((-1, 1)) 
+        mini_batches.append((X_mini, Y_mini)) 
+    if data.shape[0] % batch_size != 0: 
+        mini_batch = data[i * batch_size:data.shape[0]] 
+        X_mini = mini_batch[:, :-1] 
+        Y_mini = mini_batch[:, -1].reshape((-1, 1)) 
+        mini_batches.append((X_mini, Y_mini)) 
+    
+    return mini_batches 
+  
 
+def gradientDescent(X, y, learning_rate = 0.0000001, batch_size = 32): 
+    theta = np.zeros((X.shape[1], 1)) 
+    error_list = [] 
+    max_iters = 10000
+    for itr in range(max_iters): 
+        mini_batches = create_mini_batches(X, y, batch_size) 
+        for mini_batch in mini_batches: 
+            X_mini, y_mini = mini_batch 
+            theta =  theta - learning_rate * LogisticRegressionClassifier.gradient_descent(X_mini, y_mini, theta)  
+            error_list.append(LogisticRegressionClassifier.cost(X_mini, y_mini, theta)) 
+  
+    return theta, error_list 
+
+
+def adagrad(X, y, learning_rate = 0.000001, batch_size = 32,fudge_factor = 1e-6): 
+    theta = np.zeros((X.shape[1], 1))
+    tt = np.zeros((X.shape[1], 1))
+    error_list = [] 
+    max_iters = 1
+    for itr in range(max_iters): 
+        mini_batches = create_mini_batches(X, y, batch_size) 
+        for mini_batch in mini_batches: 
+            X_mini, y_mini = mini_batch 
+            tt+=tt**2
+            theta =  theta - learning_rate * (LogisticRegressionClassifier.gradient_descent(X_mini, y_mini, theta))/(fudge_factor + np.sqrt(tt))
+            error_list.append(LogisticRegressionClassifier.cost(X_mini, y_mini, theta)) 
+  
+    return theta, error_list 
+
+
+def Show_Image(x,y,norm_x):
     lrc_normal = LogisticRegressionClassifier()
     lrc_normal.fit(x, y)
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 10))
@@ -72,7 +96,7 @@ if(__name__=="__main__"):
     print("Unchanged Features - iterations", len(lrc_normal.cost_list))
 
     lrc_std = LogisticRegressionClassifier()
-    lrc_std.fit(x_std, y)
+    lrc_std.fit(norm_x, y)
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 10))
     ax.set(xlabel="Iteration", ylabel="Cost", title="Standardized Features")
     lrc_std.plot_cost_list(ax)
@@ -81,22 +105,53 @@ if(__name__=="__main__"):
     print("Standardized Features - Misclassification Rate:", cross_validate(x_std, y, k=5))
     print("Standardized Features - iterations:", len(lrc_std.cost_list))
 
-    lrc_log = LogisticRegressionClassifier()
-    lrc_log.fit(x_log, y)
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 10))
-    ax.set(xlabel="Iteration", ylabel="Cost", title="Logarithmize Data")
-    lrc_log.plot_cost_list(ax)
-    fig.savefig("lrc_log.png")
-    plt.close(fig)
-    print("Logarithmize Features - Misclassification Rate:", cross_validate(x_log, y, k=5))
-    print("Logarithmize Features - iterations:", len(lrc_log.cost_list))
 
-    lrc_bin = LogisticRegressionClassifier()
-    lrc_bin.fit(x_bin, y)
+def Show_normal_Image(x,y):
+    lrc_std = LogisticRegressionClassifier()
+    lrc_std.fit(x, y)
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 10))
-    ax.set(xlabel="Iteration", ylabel="Cost", title="Binarized Features")
-    lrc_bin.plot_cost_list(ax)
-    fig.savefig("lrc_bin.png")
+    ax.set(xlabel="Iteration", ylabel="Cost", title="Standardized Features")
+    lrc_std.plot_cost_list(ax)
+    fig.savefig("lrc_std.png")
     plt.close(fig)
-    print("Binarized Features - Misclassification Rate:", cross_validate(x_bin, y, k=5))
-    print("Binarized Features - iterations:", len(lrc_log.cost_list))
+    print("Standardized Features - Misclassification Rate:", cross_validate(x_std, y, k=5))
+    print("Standardized Features - iterations:", len(lrc_std.cost_list))
+
+
+if(__name__=="__main__"):
+
+    #main
+    names = ['Serial No.', 'GRE Score', 'TOEFL Score', 'University Rating', 'SOP',
+ 'LOR', 'CGPA', 'Research', 'Chance of Admit']
+
+    df = pd.read_csv("Admission_Predict.csv", header=None, names=names)
+    
+
+    #df_features = df.iloc[1:, 1:8]
+    #df_targets = df.loc[: , "Chance of Admit"]
+
+    x = df.iloc[1:, 1:8].values
+    y = df.loc[1: , "Chance of Admit"].values
+    print(x.astype(float))
+    print(y.astype(float))
+    
+    x=x.astype(float)
+    y=y.astype(float)
+
+
+    X_train = x[:350, :-1]
+    print(X_train)
+    y_train = y[:350].reshape((-1, 1))
+    print(y_train)
+    X_test = x[350:, :-1] 
+    y_test = y[350:].reshape((-1, 1)) 
+
+    # Standardizing the features onto unit scale (mean = 0 and variance = 1)
+    x_std = StandardScaler().fit_transform(X_train)
+
+    
+    Show_Image(X_train,y_train,x_std)
+    
+    gradientDescent(X_train,y_train)
+    
+

@@ -23,6 +23,7 @@ class LogisticRegressionClassifier:
     def predict(self, x):
         h_value = self.h(x, self.beta).item()
         return self.map_h(h_value)
+        
     def h(self, x, beta):
         return 1 / (1 + np.exp(-x.dot(beta)))
 
@@ -72,3 +73,4 @@ class LogisticRegressionClassifier:
                 err += 1
         err = err/x.shape[0]
         return err
+
